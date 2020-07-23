@@ -62,7 +62,7 @@
 
             {{ $tagObject := $.Scratch.Get "tagObject"  }}
 
-            <h1>{{ $v.name }}</h1>
+            <h1>{{ $.Params.title | default $v.name }}</h1>
 
             <div class="row">
                 <div class="col-12 col-lg-9">
@@ -70,13 +70,13 @@
                     <!-- If endpoint is deprecated -->
                     {{ if eq (index $v "x-deprecated") true}}
                         <div class="alert alert-danger">
-                            {{$v.description | markdownify}}
+                            {{$.Params.description | default $v.description | markdownify}}
                             {{$v.externalDocs.description}} <a href="{{$v.externalDocs.url}}">{{$v.externalDocs.url}}</a>
                         </div>
                     {{ else }}
 
 
-                        {{ $markdown := $v.description | markdownify }}
+                        {{ $markdown := $.Params.description | default $v.description | markdownify }}
 
                         <!-- need this because hugo sometimes duplicates <p> when using markdownify -->
                         {{ if not ( strings.Contains $markdown "<p>" ) }}
@@ -93,6 +93,12 @@
             {{/* sort by action summary */}}
             {{ range sort $tagObject ".action.summary" "asc"  }}
                 {{ $context := . }}
+
+                <!-- get action strings from params, why? because they are translated here -->
+                {{ $paramsAction := (dict) }}
+                {{ with $.Params.actions }}
+                    {{ $paramsAction = (index $.Params.actions (lower .action.operationId)) }}
+                {{ end }}
 
                 <!-- check if endpoint has own `server` object and set those as the server urls -->
                 {{ with .action.servers }}
@@ -128,7 +134,7 @@
                 <div class="row">
                     <div class="col-12 col-lg-9">
                         <h2 class="mb-2" id="{{ .action.summary | urlize }}">
-                            <a href="#{{ .action.summary | urlize }}">{{- .action.summary -}}</a>
+                            <a href="#{{ .action.summary | urlize }}">{{- $paramsAction.summary | default .action.summary -}}</a>
                         </h2>
                         {{ with index .action "x-unstable"}}
                         <div class="alert alert-warning mb-2">
@@ -138,7 +144,7 @@
                         <p class="mb-0"><span style="padding: 3px" class="font-semibold text-api-{{ .actionType }} bg-bg-api-{{ .actionType }}">{{ .actionType | upper }}</span>&nbsp;{{ range $.Scratch.Get "serverURLS" }}<span class="d-none" data-region="{{ .region }}">{{ .url }}</span>{{ end }}<span>{{.pathKey}}</span>
                         </p>
                         <h3 class="mt-2">{{ i18n "overview" }}</h3>
-                        <p>{{.action.description | markdownify }}</p>
+                        <p>{{ $paramsAction.description | default .action.description | markdownify }}</p>
 
                         {{ $.Scratch.Set "queryStrings" slice }}
                         {{ $.Scratch.Set "pathParams" slice }}
@@ -280,7 +286,7 @@
 
                             <h4 class="text-capitalize mt-0 mb-1 py-0">Body Data <span class='text-capitalize'>{{ cond (eq .action.requestBody.required true) "(required)" "" }}</span></h4>
 
-                            <p>{{ .action.requestBody.description | markdownify }}</p>
+                            <p>{{ $paramsAction.request_description | default .action.requestBody.description | markdownify }}</p>
 
                             <div class="tab-content">
                                 {{ range $contentType, $content := .action.requestBody.content }}
@@ -382,10 +388,14 @@
                         <div class="tab-content mb-3">
                             {{ $count := 0}}
                             {{ range $response_code, $response := .action.responses }}
+                                {{ $paramsActionResponseDesc := $response.description }}
+                                {{ with $paramsAction.responses }}
+                                    {{ $paramsActionResponseDesc = index $paramsAction.responses $response_code }}
+                                {{ end }}
                                 <div role="tabpanel" class="tab-pane {{ if eq $count 0}} active {{end}}" id="{{ $context.action.operationId }}-{{ $response_code }}">
                                     {{ with $response.content }}
 
-                                        <p class="mb-2">{{$response.description}}</p>
+                                        <p class="mb-2">{{ $paramsActionResponseDesc | default $response.description }}</p>
 
                                         {{ range $content := . }}
                                             {{ range $schema := $content }}
